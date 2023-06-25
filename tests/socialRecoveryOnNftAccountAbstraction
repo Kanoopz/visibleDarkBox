@@ -1,0 +1,203 @@
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
+const { expect } = require("chai");
+const { encodeBytes32String, keccak256 } = require("ethers");
+
+const { ethers, utils } = require("hardhat");
+
+describe
+(
+  "visibleDarkBox", function () 
+  {
+    let nftContractObject, nftContractInstance, visibleDarkBoxContractObject, visibleDarkBoxContractInstance, deployer, owner, recoveryOwner;
+
+    beforeEach
+    (
+      async function()
+      {
+        [deployer, owner, recoveryOwner] = await ethers.getSigners();
+
+        nftContractObject = await ethers.getContractFactory("genericNft", deployer);
+        nftContractInstance = await nftContractObject.deploy();
+
+        visibleDarkBoxContractObject = await ethers.getContractFactory("visibleDarkBox", deployer);
+        visibleDarkBoxContractInstance = await visibleDarkBoxContractObject.deploy();
+
+       
+      }
+    )
+
+
+    describe
+    (
+      "socialRecoveryTest", () =>
+      {
+        it
+        (
+          "mintsNft", async function()
+          {
+            await nftContractInstance.connect(owner).safeMint();
+            expect(await nftContractInstance.balanceOf(owner.getAddress())).to.eq(1);
+            expect(await nftContractInstance.ownerOf(0)).to.eq(await owner.getAddress());
+          }
+        );
+
+        it
+        (
+          "Mints and creates a visibleDarkBoxPassword", async function()
+          {
+            await nftContractInstance.connect(owner).safeMint();
+            let nftContractAddress = await nftContractInstance.getNftContractAddress();
+            expect(await nftContractInstance.balanceOf(owner.getAddress())).to.eq(1);
+            expect(await nftContractInstance.ownerOf(0)).to.eq(await owner.getAddress()); 
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            let visibleDarkBoxContractAddress = await visibleDarkBoxContractInstance.getVisibleDarkBoxAddress();
+            await nftContractInstance.connect(owner).setApprovalForAll(visibleDarkBoxContractAddress, true);
+
+            let passwordRoot = ethers.encodeBytes32String("text1");
+            let notCritical = ethers.encodeBytes32String("text2");
+
+            console.log("2: passwordRoot");
+            console.log(passwordRoot);
+            console.log("2: notCriticalPart");
+            console.log(notCritical);
+
+            await visibleDarkBoxContractInstance.connect(owner).setRecoveryPasswordConfig(nftContractAddress, 0, passwordRoot, notCritical);
+            let isSet = await visibleDarkBoxContractInstance.getIsSet(nftContractAddress, 0);
+            console.log("isSet: ");
+            console.log(isSet);
+          }
+        );
+
+        it
+        (
+          "Recovers the tokenBoundAccount", async function()
+          {
+            console.log("//IMPORTANT VALUES/////////////////////////////////////////////");
+
+            let nftContractAddress = await nftContractInstance.getNftContractAddress();
+            console.log("nftContractAddress: ", nftContractAddress);
+            let visibleDarkBoxContractAddress = await visibleDarkBoxContractInstance.getVisibleDarkBoxAddress();
+            console.log("visibleDarkBoxAsddress; ", visibleDarkBoxContractAddress);
+
+
+            let stringPasswordOne = "hola";
+            let bytes32PasswordOne = ethers.encodeBytes32String(stringPasswordOne);
+            console.log("stringOne: hola");
+            console.log("hashStringOne: ", bytes32PasswordOne);
+
+            let stringTwo = "mundo";
+            let bytes32HashTwo = ethers.encodeBytes32String(stringTwo);
+            console.log("stringTwo: mundo");
+            console.log("hashStringTwo: ", bytes32HashTwo);
+
+            let concatenateHashes = ethers.solidityPacked(["bytes32", "bytes32"], [bytes32PasswordOne, bytes32HashTwo]); 
+            console.log("hashesConcatenated: ", concatenateHashes);
+
+            let hashedHashes = keccak256(concatenateHashes);
+            console.log("hashedHashes: ", hashedHashes);
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            await nftContractInstance.connect(owner).safeMint();
+            
+            expect(await nftContractInstance.balanceOf(owner.getAddress())).to.eq(1);
+            expect(await nftContractInstance.ownerOf(0)).to.eq(await owner.getAddress()); 
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            console.log("//PART2/////////////////////////////////////////");
+
+            await nftContractInstance.connect(owner).approve(visibleDarkBoxContractAddress, 0);
+
+            let tokenApprovedAddress = await nftContractInstance.getApproved(0);
+
+            console.log("visibleDarkBoxAddress:", visibleDarkBoxContractAddress);
+            console.log("tokenApprovedAddress; ", tokenApprovedAddress);
+
+            expect(tokenApprovedAddress).to.eq(visibleDarkBoxContractAddress);
+           
+            let passwordRoot = hashedHashes
+            let notCritical = bytes32HashTwo;
+
+            await visibleDarkBoxContractInstance.connect(owner).setRecoveryPasswordConfig(nftContractAddress, 0, passwordRoot, notCritical);
+            let isSet = await visibleDarkBoxContractInstance.getIsSet(nftContractAddress, 0);
+            console.log("isSet: ");
+            console.log(isSet);
+
+            console.log("notCrucial:");
+            console.log(notCritical);
+            console.log("savedRoot:");
+            console.log(passwordRoot);
+      
+            console.log("/////////////////////////////");
+            console.log("/////////////////////////////");
+            console.log("/////////////////////////////");
+            console.log("/////////////////////////////");
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            console.log("//PART3/////////////////////////////////////////////////");
+
+            let passwordLeaf = bytes32PasswordOne;
+
+            let notCrucial = await visibleDarkBoxContractInstance.getNotCucialPassword(nftContractAddress, 0);
+            let savedRoot = await visibleDarkBoxContractInstance.getRootPassword(nftContractAddress, 0);
+            let getActualHashOfHashes = await visibleDarkBoxContractInstance.getActualHashOfHashes(nftContractAddress, 0, passwordLeaf);
+
+            console.log("passwordLeaf:");
+            console.log(passwordLeaf);
+            console.log("notCrucial:");
+            console.log(notCrucial);
+            console.log("savedRoot:");
+            console.log(savedRoot);
+            console.log("actualRoot");
+            console.log(getActualHashOfHashes);
+
+            console.log("...........................................");
+            console.log("//reclaimPart://////////////////////////////////////////////////////////////////////");
+
+            let addressToRecover = await recoveryOwner.getAddress();
+            await visibleDarkBoxContractInstance.reclaimOwnershipWithDarkBoxPassword(addressToRecover, nftContractAddress, 0, passwordLeaf);
+
+            let ownerAddress = await owner.getAddress();
+            let recoveryOwnerAddress = await recoveryOwner.getAddress();
+            console.log("ownerAddress:", ownerAddress);
+            console.log("recoveryOwnerAddress:", recoveryOwnerAddress);
+
+            let actualOwner = await nftContractInstance.ownerOf(0);
+            console.log("actualOwner;", actualOwner);
+
+
+
+            let nftOwner = await nftContractInstance.ownerOf(0);
+            expect(nftOwner).to.eq(recoveryOwnerAddress);
+
+            let originalOwnerBalance = await nftContractInstance.balanceOf(ownerAddress);
+            expect(originalOwnerBalance).to.eq(0);
+
+            let recoveryOwnerBalance = await nftContractInstance.balanceOf(recoveryOwnerAddress);
+            expect(recoveryOwnerBalance).to.eq(1);
+          }
+        )
+      }
+    );
+  }
+);
